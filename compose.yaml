@@ -1,0 +1,39 @@
+# compose.yaml — Local development with Docker Compose
+# Runs MySQL and the Spring Boot app together.
+# Usage: docker compose up --build
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: dcms_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword   # local dev only — never use in production
+      MYSQL_DATABASE: diagnostic_center
+      MYSQL_USER: dcadmin
+      MYSQL_PASSWORD: dcpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 10
+
+  app:
+    build: .
+    container_name: dcms_app
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL:      jdbc:mysql://db:3306/diagnostic_center?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: dcadmin
+      DB_PASSWORD: dcpassword
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
